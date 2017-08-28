@@ -210,7 +210,7 @@ class StartServer
             'enable_unsafe_event'      => 1,
             'max_conn'                 => 10240,   // 最大连接数
             'backlog'                  => 1024,    // 最大排队数
-            'worker_num'               => 2,      // 工作进程数
+            'worker_num'               => 3,      // 工作进程数
             'task_worker_num'          => 2,       // 任务进程数
             'max_request'              => 500,    // 进程回收数
             'dispatch_mode'            => 2,       // FD分配模式
@@ -253,10 +253,15 @@ class StartServer
 
     public function onTaskRun($srv, $taskid, $wid,$data)
     {
+		//$taskid任务id ,$wid服务端进程id
         switch ($data['event'])
         {
             case 'executeTask':
-                $this->gamer->executeTask();
+				
+                $this->gamer->executeTask($wid);
+                break;
+			case 'send_task':
+				$this->gamer->send_task($wid);
                 break;
         }
     }
@@ -292,20 +297,34 @@ class StartServer
             });
         }
 		
-        $tag = $wid < 16 ? "Worker" : "Tasker";
+        $tag = $wid < 3 ? "Worker" : "Tasker";
 
         if (PHP_OS == "Linux") {
             swoole_set_process_name("php task_queue $tag-$wid");
         }
-        
+		//这里面的事件只有work进程才能处理
+        //处理队列
         if ($wid == 1) {     
             $tick = 1000;
             $cb = function ($timerId) {
                 $data = [];
                 $data['event'] = 'executeTask';
-                $this->ss->task($data);
+				//发送给task进程处理
+				//0表示task进程的id从0开始,0表示第一个
+                $this->ss->task($data,0);
             };
             swoole_timer_tick($tick, $cb);
+        }
+		//模拟发送队列
+		if ($wid == 2) {     
+            $tick2 = 5000;
+            $cb2 = function ($timerId2) {
+                $data2 = [];
+                $data2['event'] = 'send_task';
+				
+                $this->ss->task($data2,0);
+            };
+            swoole_timer_tick($tick2, $cb2);
         }
         _LOG("onWorkerStart $tag-$wid");
 
@@ -317,7 +336,7 @@ class StartServer
 
     public function onWorkerClose($ss, $wid)
     {
-        $tag = $wid < 16 ? "Worker" : "Tasker";
+        $tag = $wid < 3 ? "Worker" : "Tasker";
 
         //$this->gamer->action(20, $data);
         /*reload之后内存数据入库*/

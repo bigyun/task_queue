@@ -193,14 +193,21 @@ class gamer
     }
 
     // 执行任务
-    public function executeTask()
+    public function executeTask($taskid)
     {
-        $this->task_broadcast();
+        $this->task_broadcast($taskid);
+    }
+	 // 模拟添加任务
+    public function send_task($taskid)
+    {
+		 _LOG("send_task:".$taskid."_".date('Y-m-d H:i:s',time()));
+		$this->redis->rPush('msg_center', json_encode(["name" => rand(1,5000).'lee'.rand(6000,10000), "sex" => "sdsd".rand(1,7000)]));
+        
     }
 	//处理队列中内容
-	public function task_broadcast(){
+	public function task_broadcast($taskid){
 		
-		 _LOG("task_broadcast:".date('Y-m-d H:i:s',time()).'---'.$this->redis->lpop('msg_center'));
+		 _LOG("task_broadcast:".date('Y-m-d H:i:s',time())."--".$taskid."--".$this->redis->lpop('msg_center'));
 	}
     protected function GetScore($p,$w){
         if($p > 0) {
